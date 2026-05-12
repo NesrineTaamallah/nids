@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NetGuard — Network Intrusion Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+/* ── CSS Variables ─────────────────────────────────────── */
+:root{
+  --bg:       #050810;
+  --bg2:      #080d18;
+  --bg3:      #0b1120;
+  --panel:    rgba(10,18,35,0.92);
+  --border:   rgba(0,200,255,0.15);
+  --border2:  rgba(0,200,255,0.35);
+  --accent:   #00c8ff;
+  --accent2:  #7b2fff;
+  --danger:   #ff3366;
+  --warn:     #ff9500;
+  --ok:       #00ff88;
+  --text:     #c8d8f0;
+  --muted:    #4a6080;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Exo 2', sans-serif;
+  --glow:     0 0 12px rgba(0,200,255,.35), 0 0 40px rgba(0,200,255,.1);
+  --glow-red: 0 0 12px rgba(255,51,102,.45), 0 0 40px rgba(255,51,102,.15);
+}
+
+/* ── Reset & Base ──────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;min-height:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:13px;
+}
+
+/* ── Scanlines overlay ─────────────────────────────────── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,transparent 2px,
+    rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px
+  );
+  pointer-events:none;z-index:9999;
+}
+
+/* ── Grid Layout ───────────────────────────────────────── */
+#app{
+  display:grid;
+  grid-template-rows:56px 1fr;
+  grid-template-columns:1fr;
+  height:100vh;
+  min-height:0;
+}
+
+/* ── Top Bar ───────────────────────────────────────────── */
+#topbar{
+  display:flex;align-items:center;gap:16px;
+  padding:0 20px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border2);
+  position:relative;
+  z-index:10;
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--sans);font-weight:900;font-size:18px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:var(--accent);
+  text-shadow:var(--glow);
+}
+.logo svg{width:28px;height:28px}
+.logo span.ver{font-size:9px;color:var(--muted);font-family:var(--mono);margin-left:4px;letter-spacing:1px}
+
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:20px;
+  font-family:var(--mono);font-size:11px;
+  border:1px solid var(--border);
+  background:rgba(0,0,0,.3);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all .3s}
+.dot.active{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.danger{background:var(--danger);box-shadow:0 0 8px var(--danger);animation:pulse 1s infinite}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.spacer{flex:1}
+
+.nav-tabs{display:flex;gap:2px}
+.tab-btn{
+  padding:6px 18px;border-radius:4px;border:none;
+  background:transparent;color:var(--muted);
+  font-family:var(--sans);font-size:12px;font-weight:600;
+  letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all .2s;
+}
+.tab-btn:hover{color:var(--accent);background:rgba(0,200,255,.06)}
+.tab-btn.active{color:var(--accent);background:rgba(0,200,255,.12);box-shadow:inset 0 -2px 0 var(--accent)}
+
+/* ── Main Content ──────────────────────────────────────── */
+#main{
+  display:grid;
+  grid-template-columns:300px 1fr 280px;
+  gap:0;
+  overflow:hidden;
+  min-height:0;
+}
+
+/* ── Panels ────────────────────────────────────────────── */
+.panel{
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  padding:16px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  min-height:0;
+}
+.panel:last-child{border-right:none;border-left:1px solid var(--border)}
+.panel-title{
+  font-family:var(--mono);font-size:10px;letter-spacing:2px;
+  color:var(--accent);text-transform:uppercase;
+  margin-bottom:14px;padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title::before{
+  content:'';display:block;width:3px;height:12px;
+  background:var(--accent);border-radius:2px;
+}
+
+/* ── Control Panel (left) ──────────────────────────────── */
+#panel-control{}
+
+.section{margin-bottom:20px}
+.section-label{
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;
+}
+
+.mode-toggle{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  background:rgba(0,0,0,.4);border-radius:8px;padding:4px;
+  margin-bottom:16px;
+}
+.mode-btn{
+  padding:10px;border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--muted);
+  font-family:var(--sans);font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .25s;text-align:center;
+}
+.mode-btn.active{
+  background:rgba(0,200,255,.15);color:var(--accent);
+  border-color:var(--border2);box-shadow:var(--glow);
+}
+
+select,input[type=text]{
+  width:100%;padding:8px 12px;
+  background:rgba(0,0,0,.5);
+  border:1px solid var(--border);border-radius:6px;
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  outline:none;transition:border-color .2s;
+  appearance:none;
+}
+select:focus,input:focus{border-color:var(--accent)}
+
+.upload-area{
+  border:2px dashed var(--border);border-radius:8px;
+  padding:24px;text-align:center;
+  background:rgba(0,0,0,.3);cursor:pointer;
+  transition:all .2s;position:relative;
+}
+.upload-area:hover,
+.upload-area.dragover{border-color:var(--accent);background:rgba(0,200,255,.06)}
+.upload-area input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;
+}
+.upload-icon{font-size:28px;margin-bottom:8px;opacity:.6}
+.upload-label{font-size:12px;color:var(--muted)}
+.upload-filename{
+  font-family:var(--mono);font-size:11px;color:var(--accent);
+  margin-top:6px;word-break:break-all;
+}
+
+.btn{
+  width:100%;padding:11px;border-radius:7px;
+  border:1px solid var(--border2);
+  background:linear-gradient(135deg,rgba(0,200,255,.15),rgba(123,47,255,.15));
+  color:var(--accent);font-family:var(--sans);font-size:13px;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all .25s;margin-top:8px;
+}
+.btn:hover{background:linear-gradient(135deg,rgba(0,200,255,.3),rgba(123,47,255,.3));box-shadow:var(--glow)}
+.btn.danger{
+  border-color:rgba(255,51,102,.4);
+  background:linear-gradient(135deg,rgba(255,51,102,.15),rgba(255,100,50,.15));
+  color:var(--danger);
+}
+.btn.danger:hover{background:linear-gradient(135deg,rgba(255,51,102,.3),rgba(255,100,50,.3));box-shadow:var(--glow-red)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── KPI Cards ─────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.kpi{
+  background:rgba(0,0,0,.4);border:1px solid var(--border);
+  border-radius:8px;padding:12px;
+}
+.kpi .val{
+  font-family:var(--mono);font-size:22px;font-weight:700;
+  color:var(--accent);
+}
+.kpi .val.red{color:var(--danger)}
+.kpi .val.green{color:var(--ok)}
+.kpi .lbl{font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:1px;text-transform:uppercase}
+
+/* ── Center panel ──────────────────────────────────────── */
+#panel-center{
+  background:var(--bg3);
+  border-right:none;
+  padding:0;
+  display:flex;flex-direction:column;
+  min-height:0;
+}
+
+#view-live,#view-csv{display:none}
+#view-live.active,#view-csv.active{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+
+/* ── Map / Radar ────────────────────────────────────────── */
+#radar-container{
+  height:260px;flex-shrink:0;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#radar-canvas{display:block}
+.radar-label{
+  position:absolute;top:12px;left:16px;
+  font-family:var(--mono);font-size:10px;color:var(--accent);
+  letter-spacing:2px;text-transform:uppercase;
+}
+.radar-label span{color:var(--muted)}
+
+/* ── Flow Table ─────────────────────────────────────────── */
+#flow-table-wrap{
+  flex:1;overflow-y:auto;
+  padding:12px 16px;
+}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+thead th{
+  color:var(--muted);font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  padding:4px 8px;border-bottom:1px solid var(--border);text-align:left;
+  position:sticky;top:0;background:var(--bg3);
+}
+tbody tr{
+  border-bottom:1px solid rgba(0,200,255,.04);
+  transition:background .15s;
+  animation:fadeRow .3s ease;
+}
+tbody tr:hover{background:rgba(0,200,255,.04)}
+@keyframes fadeRow{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+td{padding:6px 8px;vertical-align:middle}
+.badge{
+  display:inline-block;padding:2px 8px;border-radius:12px;
+  font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  border:1px solid transparent;
+}
+.badge-normal{background:rgba(0,255,136,.1);color:var(--ok);border-color:rgba(0,255,136,.3)}
+.badge-attack{background:rgba(255,51,102,.12);color:var(--danger);border-color:rgba(255,51,102,.35);animation:pulse 1.5s infinite}
+.conf-bar{
+  display:inline-block;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  min-width:4px;
+}
+
+/* ── Chart area ─────────────────────────────────────────── */
+#chart-container{
+  height:160px;flex-shrink:0;
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  padding:12px 16px;
+  position:relative;
+}
+#chart-title{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase}
+#time-chart{width:100%;height:115px}
+
+/* ── CSV results ─────────────────────────────────────────── */
+#csv-results{flex:1;overflow-y:auto;padding:16px}
+.csv-summary{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;
+}
+.csv-kpi{
+  background:rgba(0,0,0,.4);border:1px solid var(--border);
+  border-radius:8px;padding:14px;text-align:center;
+}
+.csv-kpi .n{font-family:var(--mono);font-size:24px;color:var(--accent)}
+.csv-kpi .n.red{color:var(--danger)}
+.csv-kpi .l{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+.donut-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+#donut-canvas{flex-shrink:0}
+.legend-list{flex:1;font-family:var(--mono);font-size:11px;overflow:auto;max-height:160px}
+.leg-item{display:flex;align-items:center;gap:8px;padding:3px 0}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.leg-lbl{flex:1;color:var(--text)}
+.leg-cnt{color:var(--muted)}
+
+/* ── Right Panel ─────────────────────────────────────────── */
+#panel-alerts{overflow-y:auto;min-height:0}
+
+.alert-item{
+  background:rgba(0,0,0,.3);border:1px solid var(--border);
+  border-radius:6px;padding:10px 12px;margin-bottom:8px;
+  border-left:3px solid var(--muted);
+  animation:slideIn .25s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.alert-item.attack{border-left-color:var(--danger);background:rgba(255,51,102,.05)}
+.alert-item.normal{border-left-color:var(--ok)}
+.alert-header{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.alert-cat{
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:10px;
+  background:rgba(255,51,102,.15);color:var(--danger);
+}
+.alert-time{font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:auto}
+.alert-ips{font-family:var(--mono);font-size:10px;color:var(--text);margin-bottom:3px}
+.alert-meta{font-family:var(--mono);font-size:9px;color:var(--muted)}
+.alert-conf{font-family:var(--mono);font-size:10px;color:var(--warn)}
+
+/* ── Attack distribution mini-bars ─────────────────────── */
+.mini-bars{margin-top:12px}
+.mini-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.mini-label{font-family:var(--mono);font-size:9px;color:var(--muted);width:90px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.mini-track{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.mini-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.mini-val{font-family:var(--mono);font-size:9px;color:var(--muted);width:28px;text-align:right}
+
+/* ── Progress bar ───────────────────────────────────────── */
+#progress-wrap{display:none;margin:8px 0}
+#progress-bar{
+  width:100%;height:4px;border-radius:2px;
+  background:rgba(0,0,0,.4);overflow:hidden;
+}
+#progress-fill{
+  height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width .3s;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Tooltip ─────────────────────────────────────────────── */
+#tooltip{
+  position:fixed;pointer-events:none;
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:6px;padding:8px 12px;
+  font-family:var(--mono);font-size:10px;
+  z-index:1000;display:none;
+}
+
+/* ── Responsive tweaks ──────────────────────────────────── */
+@media(max-width:900px){
+  #main{grid-template-columns:240px 1fr}
+  #panel-alerts{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- ── Top Bar ─────────────────────────────────────────────── -->
+<header id="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="16,2 30,10 30,22 16,30 2,22 2,10" fill="none" stroke="#00c8ff" stroke-width="1.5"/>
+      <polygon points="16,8 24,13 24,21 16,26 8,21 8,13" fill="rgba(0,200,255,.1)" stroke="#00c8ff" stroke-width="1"/>
+      <circle cx="16" cy="16" r="3" fill="#00c8ff"/>
+      <line x1="16" y1="8"  x2="16" y2="13" stroke="#00c8ff" stroke-width="1"/>
+      <line x1="16" y1="19" x2="16" y2="24" stroke="#00c8ff" stroke-width="1"/>
+      <line x1="8"  y1="13" x2="13" y2="16" stroke="#00c8ff" stroke-width="1"/>
+      <line x1="19" y1="16" x2="24" y2="13" stroke="#00c8ff" stroke-width="1"/>
+    </svg>
+    NetGuard <span class="ver">v2.0</span>
+  </div>
+
+  <div class="status-pill">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text" style="font-family:var(--mono);font-size:11px">OFFLINE</span>
+  </div>
+  <div class="status-pill" id="sim-pill" style="display:none;border-color:rgba(255,149,0,.4)">
+    <span style="color:#ff9500;font-family:var(--mono);font-size:10px">SIM</span>
+  </div>
+  <div class="status-pill">
+    <span style="color:var(--muted)">PACKETS</span>&nbsp;
+    <span id="hdr-packets" style="color:var(--accent)">0</span>
+  </div>
+  <div class="status-pill">
+    <span style="color:var(--muted)">FLOWS</span>&nbsp;
+    <span id="hdr-flows" style="color:var(--accent)">0</span>
+  </div>
+  <div class="status-pill" id="hdr-alert-pill" style="display:none">
+    <div class="dot danger"></div>
+    <span id="hdr-attacks" style="color:var(--danger)">0</span>&nbsp;ATTACKS
+  </div>
+  <div class="status-pill" id="hdr-kitnet-pill" title="KitNET Zero-Day Engine">
+    <div class="dot" id="hdr-kitnet-dot"></div>
+    <span style="color:var(--muted);font-size:10px">KITNET</span>&nbsp;
+    <span id="hdr-kitnet-label" style="font-family:var(--mono);font-size:10px;color:var(--muted)">—</span>
+  </div>
+
+  <div class="spacer"></div>
+</header>
+
+<!-- ── Main ─────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel" id="panel-control">
+    <div class="panel-title">Control</div>
+
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-live" onclick="switchMode('live')">⚡ Live</button>
+      <button class="mode-btn" id="mode-csv" onclick="switchMode('csv')">📂 CSV</button>
+    </div>
+
+    <!-- LIVE CONTROLS -->
+    <div id="ctrl-live">
+      <div class="section">
+        <div class="section-label">Network Interface</div>
+        <select id="iface-select">
+          <option value="simulation">🔄 Simulation Mode</option>
+          <option value="any">any (all interfaces)</option>
+          <option value="eth0">eth0</option>
+          <option value="wlan0">wlan0</option>
+          <option value="lo">lo (loopback)</option>
+        </select>
+      </div>
+
+      <div id="progress-wrap">
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+      </div>
+
+      <button class="btn" id="btn-start" onclick="startCapture()">▶ Start Capture</button>
+      <button class="btn danger" id="btn-stop" onclick="stopCapture()" disabled style="margin-top:6px">■ Stop Capture</button>
+
+      <div id="sim-badge" style="display:none;margin-top:8px;padding:6px 10px;border-radius:6px;background:rgba(255,149,0,.12);border:1px solid rgba(255,149,0,.35);font-family:var(--mono);font-size:10px;color:#ff9500;letter-spacing:.5px">
+        🔄 MODE SIMULATION — données générées par le modèle ML sur flux synthétiques
+      </div>
+      <div id="backend-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(255,51,102,.1);border:1px solid rgba(255,51,102,.35);font-family:var(--mono);font-size:10px;color:var(--danger);line-height:1.5"></div>
+
+      <div style="height:16px"></div>
+      <div class="panel-title">Live Statistics</div>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="val" id="kpi-packets">0</div>
+          <div class="lbl">Packets</div>
+        </div>
+        <div class="kpi">
+          <div class="val" id="kpi-flows">0</div>
+          <div class="lbl">Flows</div>
+        </div>
+        <div class="kpi">
+          <div class="val red" id="kpi-attacks">0</div>
+          <div class="lbl">Attacks</div>
+        </div>
+        <div class="kpi">
+          <div class="val" id="kpi-rate">0%</div>
+          <div class="lbl">Attack Rate</div>
+        </div>
+      </div>
+
+      <div class="panel-title" style="margin-top:8px">Attack Distribution</div>
+      <div class="mini-bars" id="mini-bars"></div>
+
+      <!-- KitNET Status Panel -->
+      <div style="height:16px"></div>
+      <div class="panel-title">KitNET — Zero-Day Engine</div>
+      <div id="kitnet-status-panel">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div class="dot" id="kitnet-dot"></div>
+          <span id="kitnet-status-text" style="font-family:var(--mono);font-size:11px;color:var(--muted)">LOADING…</span>
+        </div>
+        <!-- Warmup progress bar -->
+        <div id="kitnet-warmup-wrap" style="display:none;margin-bottom:10px">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;letter-spacing:1px">CALIBRATING THRESHOLD</div>
+          <div style="background:rgba(0,0,0,.4);border-radius:2px;height:4px;overflow:hidden">
+            <div id="kitnet-warmup-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s"></div>
+          </div>
+          <div id="kitnet-warmup-pct" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px">0 / 500 packets</div>
+        </div>
+        <!-- Live RMSE metric -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          <div class="kpi" style="padding:8px">
+            <div class="val" id="kitnet-rmse" style="font-size:16px">—</div>
+            <div class="lbl">Last RMSE</div>
+          </div>
+          <div class="kpi" style="padding:8px">
+            <div class="val" id="kitnet-threshold-val" style="font-size:16px">—</div>
+            <div class="lbl">Threshold</div>
+          </div>
+          <div class="kpi" style="padding:8px">
+            <div class="val" id="kitnet-anomalies">0</div>
+            <div class="lbl">Anomalies</div>
+          </div>
+          <div class="kpi" style="padding:8px">
+            <div class="val" id="kitnet-packets">0</div>
+            <div class="lbl">Scored</div>
+          </div>
+        </div>
+        <!-- RMSE mini sparkline -->
+        <canvas id="kitnet-sparkline" width="252" height="40" style="width:100%;border-radius:4px;background:rgba(0,0,0,.3)"></canvas>
+      </div>
+    </div>
+
+    <!-- CSV CONTROLS -->
+    <div id="ctrl-csv" style="display:none">
+      <div class="section">
+        <div class="section-label">Upload UNSW-NB15 CSV</div>
+        <div class="upload-area" id="drop-zone">
+          <input type="file" accept=".csv" id="csv-input" onchange="onFileSelect(event)"/>
+          <div class="upload-icon">📂</div>
+          <div class="upload-label">Drop CSV file here<br><small>or click to browse</small></div>
+          <div class="upload-filename" id="csv-filename"></div>
+        </div>
+      </div>
+      <button class="btn" id="btn-analyze" onclick="analyzeCSV()" disabled>🔍 Analyze CSV</button>
+
+      <div style="height:16px"></div>
+      <div class="panel-title">CSV Results</div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="val" id="csv-total">—</div><div class="lbl">Total</div></div>
+        <div class="kpi"><div class="val red" id="csv-atk">—</div><div class="lbl">Attacks</div></div>
+        <div class="kpi"><div class="val green" id="csv-norm">—</div><div class="lbl">Normal</div></div>
+        <div class="kpi"><div class="val" id="csv-rate">—</div><div class="lbl">Rate</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER PANEL -->
+  <main id="panel-center">
+
+    <!-- LIVE VIEW -->
+    <div id="view-live" class="active">
+      <!-- Radar -->
+      <div id="radar-container">
+        <div class="radar-label">NETWORK RADAR <span>— real-time</span></div>
+        <canvas id="radar-canvas" width="520" height="240"></canvas>
+      </div>
+
+      <!-- Flow table -->
+      <div id="flow-table-wrap">
+        <table id="flow-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Src IP</th>
+              <th>→ Dst IP</th>
+              <th>Proto</th>
+              <th>Service</th>
+              <th>Status</th>
+              <th>Category</th>
+              <th>Conf</th>
+              <th>RMSE</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="flow-tbody"></tbody>
+        </table>
+        <div id="no-flows" style="text-align:center;color:var(--muted);padding:40px;font-family:var(--mono);font-size:12px">
+          Start capture to see live flows...
+        </div>
+      </div>
+
+      <!-- Time chart -->
+      <div id="chart-container">
+        <div id="chart-title">FLOWS PER SECOND — attack vs normal</div>
+        <canvas id="time-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- CSV VIEW -->
+    <div id="view-csv">
+      <div id="csv-results">
+        <div id="csv-placeholder" style="text-align:center;color:var(--muted);padding:60px;font-family:var(--mono)">
+          Upload a CSV file to begin analysis...
+        </div>
+        <div id="csv-content" style="display:none">
+          <div class="csv-summary" id="csv-summary-cards"></div>
+          <div class="panel-title">Attack Category Distribution</div>
+          <div class="donut-row">
+            <canvas id="donut-canvas" width="160" height="160"></canvas>
+            <div class="legend-list" id="donut-legend"></div>
+          </div>
+          <div class="panel-title" style="margin-top:8px">Detection Results (first 200)</div>
+          <table id="csv-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Src IP</th><th>Dst IP</th>
+                <th>Proto</th><th>Status</th><th>Category</th><th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="csv-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="panel" id="panel-alerts">
+    <div class="panel-title">Alert Feed</div>
+    <div id="alert-list">
+      <div style="text-align:center;color:var(--muted);padding:30px;font-family:var(--mono);font-size:11px">
+        No alerts yet...
+      </div>
+    </div>
+  </aside>
+
+</div><!-- #main -->
+</div><!-- #app -->
+
+<div id="tooltip"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const API = (window.location.port === '5050' || window.location.port === '')
+  ? window.location.origin.replace(/\/+$/, '')
+  : 'http://localhost:5050';
+
+// ── DEBUG LOGGER ───────────────────────────────────────────────────────────
+const DEBUG = true; // set false in production
+const _dbgLog = [];
+function dbg(tag, msg, data) {
+  const ts = new Date().toISOString().slice(11, 23);
+  const line = `[${ts}] [${tag}] ${msg}`;
+  if (DEBUG) console.log(line, data !== undefined ? data : '');
+  _dbgLog.unshift({ ts, tag, msg, data: data !== undefined ? JSON.stringify(data).slice(0, 200) : '' });
+  if (_dbgLog.length > 200) _dbgLog.pop();
+  _renderDebugPanel();
+}
+
+function _renderDebugPanel() {
+  const el = document.getElementById('debug-log');
+  if (!el) return;
+  const panel = document.getElementById('debug-panel');
+  // Only render if the debug panel is actually visible
+  if (!panel || (panel.style.display !== 'flex' && panel.style.display !== 'block')) return;
+  el.innerHTML = _dbgLog.slice(0, 40).map(l => {
+    const col = l.tag === 'ERROR' ? 'var(--danger)' : l.tag === 'SSE' ? 'var(--accent)' : l.tag === 'STATS' ? 'var(--ok)' : 'var(--muted)';
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.04);padding:2px 0">
+      <span style="color:var(--muted);font-size:9px">${l.ts}</span>
+      <span style="color:${col};font-size:9px;margin:0 4px">[${l.tag}]</span>
+      <span style="color:var(--text);font-size:10px">${l.msg}</span>
+      ${l.data ? `<div style="color:var(--muted);font-size:9px;padding-left:8px;word-break:break-all">${l.data}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Toggle debug panel with Ctrl+D
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    const panel = document.getElementById('debug-panel');
+    if (panel) {
+      const isHidden = panel.style.display === 'none' || panel.style.display === '';
+      panel.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) _renderDebugPanel();
+    }
+  }
+});
+
+// ── Backend health check ────────────────────────────────────────────────────
+async function checkBackend() {
+  dbg('CHECK', `Checking ${API}/health …`);
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    dbg('CHECK', `Health OK: models_ready=${d.models_ready} features=${d.feature_count}`, d);
+    const r2 = await fetch(`${API}/api/status`, { signal: AbortSignal.timeout(3000) });
+    const d2 = await r2.json();
+    dbg('CHECK', `Status: running=${d2.capture?.running} flows=${d2.capture?.flows_analyzed}`, {
+      models: d2.models_loaded, feats: d2.feature_count, classes: d2.attack_classes?.length
+    });
+  } catch(e) {
+    dbg('ERROR', `Backend unreachable at ${API}: ${e.message}`);
+  }
+}
+
+async function checkCapture() {
+  dbg('CAPTURE', `Checking live capture state at ${API}/api/debug/capture …`);
+  try {
+    const r = await fetch(`${API}/api/debug/capture`, { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    dbg('CAPTURE', `active_flows=${d.active_flows_in_extractor} sse_clients=${d.sse_clients} parse_errs=${d.parse_errors}`, {
+      pkts: d.capture_state?.packets_captured,
+      flows: d.capture_state?.flows_analyzed,
+      attacks: d.capture_state?.attacks_detected,
+      running: d.capture_state?.running,
+      interface: d.capture_state?.interface,
+      alerts: d.recent_alerts_count,
+    });
+    if (d.active_flows_sample?.length > 0) {
+      d.active_flows_sample.slice(0,5).forEach((f,i) => {
+        dbg('FLOW', `#${i+1} ${f.key} spkts=${f.spkts} dpkts=${f.dpkts} idle=${f.idle}s dur=${f.dur}s`);
+      });
+    } else {
+      dbg('CAPTURE', 'No active flows in extractor — tshark may not be sending packets or filter is blocking them');
+    }
+  } catch(e) {
+    dbg('ERROR', `checkCapture failed: ${e.message}`);
+  }
+}
+
+dbg('INIT', `NetGuard frontend loaded`, { api: API, port: window.location.port });
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentMode  = 'live';
+let currentTab   = 'live';
+let captureRunning = false;
+let selectedFile = null;
+let evtSource    = null;
+
+let flowRows     = [];    // ring buffer for table
+let attackDist   = {};    // category → count
+let timeData     = { normal: [], attacks: [], labels: [] };
+let totalFlows   = 0;
+let totalAttacks = 0;
+let totalPackets = 0;
+
+const ATTACK_COLORS = {
+  Normal:'#22c55e', Fuzzers:'#f97316', Analysis:'#3b82f6',
+  Backdoors:'#a855f7', Backdoor:'#a855f7', DoS:'#ef4444', Exploits:'#ec4899',
+  Generic:'#eab308', Reconnaissance:'#06b6d4',
+  Shellcode:'#f43f5e', Worms:'#84cc16',
+  Rare_Attack_Worms_or_Shellcode:'#ff6b35',
+};
+const MAX_ROWS = 60;
+const MAX_TIME = 60;
+
+// ── Tab / Mode switching ───────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===(tab==='live'?0:1)));
+  switchMode(tab);
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.getElementById('ctrl-live').style.display = mode==='live' ? '' : 'none';
+  document.getElementById('ctrl-csv').style.display  = mode==='csv'  ? '' : 'none';
+  document.getElementById('view-live').classList.toggle('active', mode==='live');
+  document.getElementById('view-csv').classList.toggle('active',  mode==='csv');
+  document.getElementById('mode-live').classList.toggle('active', mode==='live');
+  document.getElementById('mode-csv').classList.toggle('active',  mode==='csv');
+}
+
+// ── Interface list ─────────────────────────────────────────────────────────
+async function loadInterfaces(retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(`${API}/api/interfaces`, {
+        signal: AbortSignal.timeout(6000)  // 6s au lieu de 3s
+      });
+      const d = await r.json();
+      const sel = document.getElementById('iface-select');
+      sel.innerHTML = '';
+      const sim = document.createElement('option');
+      sim.value = 'simulation'; sim.textContent = '🔄 Simulation Mode';
+      sel.appendChild(sim);
+      (d.interfaces || []).forEach(i => {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = i; sel.appendChild(o);
+      });
+      dbg('INIT', `Got ${(d.interfaces||[]).length} interfaces (attempt ${attempt})`);
+      return; // succès
+    } catch(e) {
+      dbg('ERROR', `loadInterfaces attempt ${attempt}/${retries} failed: ${e.message}`);
+      if (attempt < retries) await new Promise(res => setTimeout(res, 2000)); // attendre 2s
+    }
+  }
+}
+
+// ── SSE ────────────────────────────────────────────────────────────────────
+let _sseReconnectCount = 0;
+function connectSSE() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  const url = `${API}/api/events`;
+  dbg('SSE', `Connecting to ${url} (attempt #${++_sseReconnectCount})`);
+  evtSource = new EventSource(url);
+
+  evtSource.onopen = () => {
+    dbg('SSE', 'Connection opened ✓', { readyState: evtSource.readyState });
+  };
+
+  evtSource.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'ping') {
+        dbg('SSE', 'Heartbeat ping received');
+        return;
+      }
+      if (data.type === 'connected') {
+        dbg('SSE', 'Stream handshake: ready');
+        return;
+      }
+      if (data.type === 'detection') {
+        dbg('SSE', `Detection → ${data.label_str} [${data.category}] conf=${data.confidence}%`, {
+          src: data.src_ip, dst: data.dst_ip, proto: data.proto, svc: data.service, sim: data.simulated
+        });
+        handleDetection(data);
+      } else if (data.type === 'stats') {
+        dbg('STATS', `packets=${data.stats?.packets_captured} flows=${data.stats?.flows_analyzed} attacks=${data.stats?.attacks_detected}`);
+        handleStats(data);
+      } else if (data.type === 'capture_stopped') {
+        dbg('SSE', 'Capture stopped signal received');
+        onCaptureStopped();
+      } else {
+        dbg('SSE', `Unknown event type: ${data.type}`, data);
+      }
+    } catch(err) {
+      dbg('ERROR', `SSE parse error: ${err.message}`, e.data?.slice(0, 100));
+    }
+  };
+
+  evtSource.onerror = (err) => {
+    dbg('ERROR', `SSE error — readyState=${evtSource?.readyState}. Reconnecting in 2s…`);
+    evtSource.close(); evtSource = null;
+    if (captureRunning) {
+      setTimeout(() => { if (captureRunning) connectSSE(); }, 2000);
+    }
+  };
+}
+
+function disconnectSSE() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+}
+
+// ── Capture start/stop ─────────────────────────────────────────────────────
+async function startCapture() {
+  if (captureRunning) { dbg('CAPTURE', 'Already running — ignoring double-click'); return; }
+  const iface = document.getElementById('iface-select').value;
+  dbg('CAPTURE', `Starting capture on interface: "${iface}"`);
+  document.getElementById('btn-start').disabled = true;
+
+  // Reset state for new capture session
+  flowRows = []; attackDist = {}; totalFlows = 0; totalAttacks = 0; totalPackets = 0;
+  timeData = { normal: [], attacks: [], labels: [] };
+  document.getElementById('flow-tbody').innerHTML = '';
+  document.getElementById('alert-list').innerHTML =
+    '<div style="text-align:center;color:var(--muted);padding:30px;font-family:var(--mono);font-size:11px">No alerts yet...</div>';
+  renderMiniBars();
+  updateKPIs();
+
+  try {
+    dbg('CAPTURE', `POST ${API}/api/capture/start`, { interface: iface });
+    const r = await fetch(`${API}/api/capture/start`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ interface: iface })
+    });
+    if (!r.ok) {
+      const d = await r.json();
+      dbg('ERROR', `Start capture failed: ${r.status}`, d);
+      alert(d.error || `HTTP ${r.status}`);
+      document.getElementById('btn-start').disabled = false;
+      return;
+    }
+    const resp = await r.json();
+    dbg('CAPTURE', `Backend started`, resp);
+    // Connect SSE FIRST, then mark UI as running
+    captureRunning = true;
+    connectSSE();
+    setUICapturing(true);
+    // Show simulation badge AND pill
+    const simBadge = document.getElementById('sim-badge');
+    if (simBadge) simBadge.style.display = iface === 'simulation' ? '' : 'none';
+    const simPillEl = document.getElementById('sim-pill');
+    if (simPillEl) simPillEl.style.display = iface === 'simulation' ? '' : 'none';
+  } catch(e) {
+    dbg('ERROR', `Cannot reach backend at ${API}: ${e.message}`);
+    document.getElementById('btn-start').disabled = false;
+    const errMsg = document.getElementById('backend-error');
+    if (errMsg) {
+      errMsg.style.display = '';
+      errMsg.innerHTML = `⚠️ Backend non disponible sur <b>${API}</b>.<br>Lancez : <code>python app.py</code><br><small>${e.message}</small>`;
+      setTimeout(() => { if(errMsg) errMsg.style.display = 'none'; }, 10000);
+    } else {
+      alert(`Backend non disponible.\nURL: ${API}\nErreur: ${e.message}\n\nLancez : python app.py`);
+    }
+  }
+}
+
+async function stopCapture() {
+  dbg('CAPTURE', 'Stopping capture…');
+  try { await fetch(`${API}/api/capture/stop`, {method:'POST'}); } catch(e){ dbg('ERROR', `Stop failed: ${e.message}`); }
+  captureRunning = false;
+  stopLocalSimulation();
+  disconnectSSE();
+  setUICapturing(false);
+  const simBadge2 = document.getElementById('sim-badge');
+  if (simBadge2) simBadge2.style.display = 'none';
+  const simPill2 = document.getElementById('sim-pill');
+  if (simPill2) simPill2.style.display = 'none';
+  dbg('CAPTURE', `Session ended — flows=${totalFlows} attacks=${totalAttacks} packets=${totalPackets}`);
+}
+
+function onCaptureStopped() {
+  captureRunning = false;
+  setUICapturing(false);
+}
+
+function setUICapturing(on) {
+  document.getElementById('btn-start').disabled = on;
+  document.getElementById('btn-stop').disabled  = !on;
+  document.getElementById('status-dot').className = 'dot' + (on ? ' active' : '');
+  document.getElementById('status-text').textContent = on ? 'CAPTURING' : 'OFFLINE';
+  // Hide the "start capture" placeholder whenever we're running
+  document.getElementById('no-flows').style.display = on ? 'none' : '';
+}
+
+// startLocalSimulation intentionally removed — simulation is handled server-side
+// via the "simulation" interface option in app.py's _run_simulation()
+function stopLocalSimulation() {
+  // no-op: kept for compatibility with stopCapture() call
+}
+
+// ── Handle detection event ─────────────────────────────────────────────────
+let _detectionCount = 0;
+let _sseEventCount = 0;
+// KitNET warmup total — must match KITNET_WARMUP_PKTS in app.py
+const KITNET_WARMUP_TOTAL = 500;
+// Fixed threshold pre-computed offline — must match KITNET_FIXED_THRESHOLD in app.py
+const KITNET_FIXED_THRESHOLD = 0.046556;
+
+function _updateKitnetPanel(d) {
+  const phase     = d.kitnet_phase;
+  const progress  = d.kitnet_progress;   // 0.0 – 1.0
+  const rmse      = d.rmse;             // float (field name in SSE event)
+  const threshold = d.kitnet_threshold;  // float | null
+
+  if (phase === undefined) return;   // old backend without KitNET fields
+
+  // ── Warmup bar ──────────────────────────────────────────────────────────
+  const wrap = document.getElementById('kitnet-warmup-wrap');
+  const fill = document.getElementById('kitnet-warmup-fill');
+  const pct  = document.getElementById('kitnet-warmup-pct');
+
+  if (wrap) {
+    if (phase === 'warmup') {
+      wrap.style.display = '';
+      const done = Math.round((progress ?? 0) * KITNET_WARMUP_TOTAL);
+      if (fill) fill.style.width = `${Math.round((progress ?? 0) * 100)}%`;
+      if (pct)  pct.textContent  = `${done} / ${KITNET_WARMUP_TOTAL} packets`;
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  // ── RMSE ────────────────────────────────────────────────────────────────
+  const rmseEl = document.getElementById('kitnet-rmse');
+  if (rmseEl && rmse !== undefined) {
+    rmseEl.textContent = (typeof rmse === 'number') ? rmse.toFixed(4) : '—';
+    rmseEl.style.color = '';   // reset anomaly colouring if any
+  }
+
+  // ── Threshold ───────────────────────────────────────────────────────────
+  const thrEl = document.getElementById('kitnet-threshold-val');
+  if (thrEl) {
+    if (threshold !== null && threshold !== undefined) {
+      thrEl.textContent = threshold.toFixed(4);
+      thrEl.style.color = phase === 'warmup' ? 'var(--muted)' : '';
+    } else {
+      thrEl.textContent = phase === 'warmup' ? '…' : '—';
+    }
+  }
+
+  // ── Packet counter ───────────────────────────────────────────────────────
+  // packet_count not forwarded in detection SSE events; updated via /api/status
+}
+
+function handleDetection(d) {
+  _detectionCount++;
+  _sseEventCount++;
+  totalFlows++;
+  if(d.label===1) totalAttacks++;
+
+  if (_detectionCount <= 10 || _detectionCount % 25 === 0) {
+    dbg('DETECT', `#${_detectionCount} ${d.label_str}/${d.category} conf=${d.confidence}% sim=${d.simulated}`, {
+      src: d.src_ip, dst: d.dst_ip, proto: d.proto, svc: d.service
+    });
+  }
+
+  // Update SSE event counter in debug panel header
+  const sseCounter = document.getElementById('dbg-sse-count');
+  if (sseCounter) sseCounter.textContent = `SSE: ${_sseEventCount} events`;
+
+  // Show/hide simulation indicator based on backend flag
+  const simPill = document.getElementById('sim-pill');
+  if (simPill && d.simulated !== undefined) simPill.style.display = d.simulated ? '' : 'none';
+  const simBadgeEl = document.getElementById('sim-badge');
+  if (simBadgeEl && d.simulated !== undefined) simBadgeEl.style.display = d.simulated ? '' : 'none';
+
+  // ── KitNET live panel update ─────────────────────────────────────────────
+  _updateKitnetPanel(d);
+
+  attackDist[d.category] = (attackDist[d.category]||0)+1;
+  updateKPIs();
+  flowRows.unshift(d);
+  if(flowRows.length > MAX_ROWS) flowRows.pop();
+  renderFlowTable();
+  if(d.label===1) addAlert(d);
+  renderMiniBars();
+  addRadarBlip(d);
+}
+
+function handleStats(d) {
+  if(!d.stats) { dbg('STATS', 'Received stats event with no .stats field', d); return; }
+  const prev = { totalPackets, totalFlows, totalAttacks };
+  // Trust the backend's authoritative counters
+  totalPackets = d.stats.packets_captured ?? totalPackets;
+  totalFlows   = d.stats.flows_analyzed   ?? totalFlows;
+  totalAttacks = d.stats.attacks_detected ?? totalAttacks;
+  dbg('STATS', `pkts=${totalPackets} flows=${totalFlows} attacks=${totalAttacks} (was pkts=${prev.totalPackets})`);
+  updateKPIs();
+  if(d.history && d.history.length > 1){
+    // Compute per-interval DELTAS so the chart shows activity rate (not cumulative sums)
+    const hist = d.history;
+    const labels  = [];
+    const attacks = [];
+    const normal  = [];
+    for(let i = 0; i < hist.length; i++){
+      labels.push(new Date(hist[i].timestamp).toLocaleTimeString());
+      if(i === 0){
+        // First point: use raw values as-is
+        const atk = hist[i].attacks || 0;
+        const tot = hist[i].flows   || 0;
+        attacks.push(atk);
+        normal.push(Math.max(0, tot - atk));
+      } else {
+        const dAtk = Math.max(0, (hist[i].attacks || 0) - (hist[i-1].attacks || 0));
+        const dTot = Math.max(0, (hist[i].flows   || 0) - (hist[i-1].flows   || 0));
+        attacks.push(dAtk);
+        normal.push(Math.max(0, dTot - dAtk));
+      }
+    }
+    timeData.labels  = labels;
+    timeData.attacks = attacks;
+    timeData.normal  = normal;
+    drawTimeChart();
+    dbg('STATS', `Time-series updated: ${hist.length} points (delta mode)`);
+  }
+}
+
+function updateKPIs(){
+  document.getElementById('kpi-packets').textContent  = fmt(totalPackets);
+  document.getElementById('kpi-flows').textContent    = fmt(totalFlows);
+  document.getElementById('kpi-attacks').textContent  = fmt(totalAttacks);
+  const rate = totalFlows ? ((totalAttacks/totalFlows)*100).toFixed(1)+'%' : '0%';
+  document.getElementById('kpi-rate').textContent     = rate;
+  document.getElementById('hdr-packets').textContent  = fmt(totalPackets);
+  document.getElementById('hdr-flows').textContent    = fmt(totalFlows);
+  document.getElementById('hdr-attacks').textContent  = fmt(totalAttacks);
+  const pill = document.getElementById('hdr-alert-pill');
+  pill.style.display = totalAttacks > 0 ? '' : 'none';
+}
+
+function fmt(n){ return n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(1)+'K' : String(n); }
+
+function fmtTime(ts) {
+  if (!ts) return '--:--:--';
+  // Handle ISO string or unix epoch (number)
+  const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+  if (isNaN(d)) return '--:--:--';
+  return d.toLocaleTimeString('fr', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+// ── Flow Table ─────────────────────────────────────────────────────────────
+function renderFlowTable(){
+  const tbody = document.getElementById('flow-tbody');
+  tbody.innerHTML = '';
+  flowRows.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    const conf = r.confidence||0;
+    const bar = `<span class="conf-bar" style="width:${Math.round(conf*0.5)}px"></span>`;
+    const badge = r.label===1
+      ? `<span class="badge badge-attack">ATTACK</span>`
+      : `<span class="badge badge-normal">NORMAL</span>`;
+    const catColor = ATTACK_COLORS[r.category]||'#6b7280';
+    // RMSE column: color-code by anomaly state
+    let rmseCell = '<td style="color:var(--muted);font-size:9px">—</td>';
+    if (r.rmse !== undefined && r.rmse !== null) {
+      const rmseVal = parseFloat(r.rmse).toFixed(4);
+      const rmseColor = r.is_anomaly ? 'var(--danger)' : (r.kitnet_trained ? 'var(--ok)' : 'var(--muted)');
+      const anomalyFlag = r.is_anomaly ? ' ⚡' : '';
+      rmseCell = `<td style="color:${rmseColor};font-family:var(--mono);font-size:9px">${rmseVal}${anomalyFlag}</td>`;
+    }
+    tr.innerHTML = `
+      <td style="color:var(--muted)">${totalFlows-i}</td>
+      <td>${r.src_ip}</td>
+      <td style="color:var(--muted)">${r.dst_ip}</td>
+      <td style="color:#60a5fa">${r.proto}</td>
+      <td>${r.service||'-'}</td>
+      <td>${badge}</td>
+      <td><span style="color:${catColor};font-size:10px">${r.category}</span></td>
+      <td>${bar} ${conf}%</td>
+      ${rmseCell}
+      <td style="color:var(--muted)">${fmtTime(r.timestamp)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Alert Feed ─────────────────────────────────────────────────────────────
+function addAlert(d){
+  const list = document.getElementById('alert-list');
+  // remove placeholder
+  const ph = list.querySelector('div');
+  if(ph && ph.style.textAlign) ph.remove();
+
+  const el = document.createElement('div');
+  el.className = 'alert-item attack';
+  const t = fmtTime(d.timestamp);
+  el.innerHTML = `
+    <div class="alert-header">
+      <span class="alert-cat">${d.category}</span>
+      <span class="alert-time">${t}</span>
+    </div>
+    <div class="alert-ips">${d.src_ip} → ${d.dst_ip}</div>
+    <div class="alert-meta">${d.proto.toUpperCase()} :${d.dport} | ${d.service||'-'}</div>
+    <div class="alert-conf">Confidence: ${d.confidence}%</div>
+  `;
+  list.insertBefore(el, list.firstChild);
+  // keep max 50
+  while(list.children.length > 50) list.lastChild.remove();
+}
+
+// ── Mini bars ──────────────────────────────────────────────────────────────
+function renderMiniBars(){
+  const wrap = document.getElementById('mini-bars');
+  wrap.innerHTML = '';
+  const total = Object.values(attackDist).reduce((a,b)=>a+b,0)||1;
+  Object.entries(attackDist).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([cat,cnt])=>{
+    const pct = Math.round(cnt/total*100);
+    const col = ATTACK_COLORS[cat]||'#6b7280';
+    const row = document.createElement('div');
+    row.className = 'mini-row';
+    row.innerHTML = `
+      <div class="mini-label">${cat}</div>
+      <div class="mini-track"><div class="mini-fill" style="width:${pct}%;background:${col}"></div></div>
+      <div class="mini-val">${cnt}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+// ── Radar canvas ───────────────────────────────────────────────────────────
+const radarCanvas = document.getElementById('radar-canvas');
+const rctx = radarCanvas.getContext('2d');
+let radarBlips = [];
+let radarAngle = 0;
+
+function drawRadar(){
+  const w = radarCanvas.width, h = radarCanvas.height;
+  const cx = w/2, cy = h/2;
+  const R = Math.min(cx, cy) - 10;
+
+  rctx.clearRect(0,0,w,h);
+
+  // Background gradient
+  const bg = rctx.createRadialGradient(cx,cy,0,cx,cy,R);
+  bg.addColorStop(0,'rgba(0,200,255,.04)');
+  bg.addColorStop(1,'rgba(0,0,0,0)');
+  rctx.fillStyle = bg;
+  rctx.beginPath(); rctx.arc(cx,cy,R,0,Math.PI*2); rctx.fill();
+
+  // Rings
+  [1,.7,.4].forEach(f=>{
+    rctx.beginPath(); rctx.arc(cx,cy,R*f,0,Math.PI*2);
+    rctx.strokeStyle='rgba(0,200,255,.1)'; rctx.lineWidth=1; rctx.stroke();
+  });
+
+  // Cross-hairs
+  rctx.strokeStyle='rgba(0,200,255,.07)'; rctx.lineWidth=1;
+  rctx.beginPath(); rctx.moveTo(cx-R,cy); rctx.lineTo(cx+R,cy); rctx.stroke();
+  rctx.beginPath(); rctx.moveTo(cx,cy-R); rctx.lineTo(cx,cy+R); rctx.stroke();
+
+  // Sweep
+  const sweep = rctx.createConicalGradient ? null : null;
+  rctx.save();
+  rctx.translate(cx,cy);
+  rctx.rotate(radarAngle);
+  const gr = rctx.createLinearGradient(0,-R,0,R);
+  gr.addColorStop(0,'rgba(0,200,255,.4)');
+  gr.addColorStop(1,'rgba(0,200,255,0)');
+  rctx.beginPath();
+  rctx.moveTo(0,0);
+  rctx.arc(0,0,R,-Math.PI*0.3,0);
+  rctx.closePath();
+  rctx.fillStyle=gr;
+  rctx.fill();
+  // Sweep line
+  rctx.beginPath(); rctx.moveTo(0,0); rctx.lineTo(0,-R);
+  rctx.strokeStyle='rgba(0,200,255,.9)'; rctx.lineWidth=1.5; rctx.stroke();
+  rctx.restore();
+  radarAngle += 0.025;
+
+  // Blips
+  const now = Date.now();
+  radarBlips = radarBlips.filter(b => now - b.born < 3000);
+  radarBlips.forEach(b => {
+    const age = (now - b.born)/3000;
+    const alpha = 1 - age;
+    const sz = 4 + age*3;
+    rctx.beginPath();
+    rctx.arc(b.x, b.y, sz, 0, Math.PI*2);
+    rctx.fillStyle = b.color + Math.floor(alpha*255).toString(16).padStart(2,'0');
+    rctx.fill();
+    rctx.beginPath();
+    rctx.arc(b.x, b.y, sz+4*age, 0, Math.PI*2);
+    rctx.strokeStyle = b.color + Math.floor(alpha*128).toString(16).padStart(2,'0');
+    rctx.lineWidth = 1; rctx.stroke();
+  });
+
+  requestAnimationFrame(drawRadar);
+}
+
+function addRadarBlip(d){
+  const w = radarCanvas.width, h = radarCanvas.height;
+  const cx = w/2, cy = h/2;
+  const R = Math.min(cx,cy) - 10;
+  const r = Math.random() * R * 0.85;
+  const a = Math.random() * Math.PI * 2;
+  radarBlips.push({
+    x: cx + r*Math.cos(a), y: cy + r*Math.sin(a),
+    color: ATTACK_COLORS[d.category] || '#00c8ff',
+    born: Date.now(),
+  });
+}
+
+// ── Time Chart ─────────────────────────────────────────────────────────────
+const tcCanvas = document.getElementById('time-chart');
+const tctx = tcCanvas.getContext('2d');
+
+function drawTimeChart(){
+  const w = tcCanvas.width, h = tcCanvas.height;
+  tctx.clearRect(0,0,w,h);
+  if(timeData.labels.length < 2) return;
+
+  const maxV = Math.max(...timeData.attacks, ...timeData.normal, 1);
+  const n = timeData.labels.length;
+
+  function drawLine(data, color){
+    tctx.beginPath();
+    data.forEach((v,i)=>{
+      const x = (i/(n-1))*w;
+      const y = h - (v/maxV)*h*0.85 - 4;
+      i===0 ? tctx.moveTo(x,y) : tctx.lineTo(x,y);
+    });
+    tctx.strokeStyle = color; tctx.lineWidth = 1.5;
+    tctx.shadowBlur = 4; tctx.shadowColor = color;
+    tctx.stroke();
+    tctx.shadowBlur = 0;
+  }
+
+  drawLine(timeData.normal,  '#22c55e');
+  drawLine(timeData.attacks, '#ff3366');
+
+  // axis labels
+  tctx.fillStyle = 'rgba(74,96,128,.7)';
+  tctx.font = '9px "Share Tech Mono"';
+  [0, Math.floor(n/2), n-1].forEach(i=>{
+    if(!timeData.labels[i]) return;
+    const x = (i/(n-1))*w;
+    tctx.fillText(timeData.labels[i], x - 20, h-1);
+  });
+}
+
+// ── CSV Analysis ───────────────────────────────────────────────────────────
+function onFileSelect(e){
+  selectedFile = e.target.files[0];
+  if(selectedFile){
+    document.getElementById('csv-filename').textContent = selectedFile.name;
+    document.getElementById('btn-analyze').disabled = false;
+  }
+}
+
+// Drag-drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('dragover')});
+dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if(f && f.name.endsWith('.csv')){
+    selectedFile = f;
+    document.getElementById('csv-filename').textContent = f.name;
+    document.getElementById('btn-analyze').disabled = false;
+  }
+});
+
+async function analyzeCSV(){
+  if(!selectedFile) return;
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+
+  const form = new FormData();
+  form.append('file', selectedFile);
+  dbg('CSV', `Uploading ${selectedFile.name} (${(selectedFile.size/1024).toFixed(1)} KB) to ${API}/api/analyze/csv`);
+
+  try {
+    const r = await fetch(`${API}/api/analyze/csv`, {method:'POST', body: form});
+    if(!r.ok){
+      const d = await r.json().catch(()=>({error:`HTTP ${r.status}`}));
+      dbg('ERROR', `CSV analysis failed: ${r.status}`, d);
+      alert(`Erreur analyse CSV:\n${d.error || r.status}`);
+      return;
+    }
+    const d = await r.json();
+    dbg('CSV', `Analysis done: total=${d.total} attacks=${d.attacks} rate=${d.attack_rate}% model=${d.models_used}`);
+    if (d.warning) dbg('CSV', `Warning: ${d.warning}`);
+    renderCSVResults(d);
+  } catch(e) {
+    dbg('ERROR', `CSV fetch failed: ${e.message}`);
+    // No fake fallback — show a real error message
+    const wrap = document.getElementById('csv-results');
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'background:rgba(255,51,102,.1);border:1px solid rgba(255,51,102,.35);border-radius:6px;padding:16px;font-family:var(--mono);font-size:12px;color:var(--danger);margin:16px';
+    errDiv.innerHTML = `⚠️ Backend non disponible.<br><br>
+      URL tentée : <b>${API}/api/analyze/csv</b><br>
+      Erreur : ${e.message}<br><br>
+      Lancez le backend : <code style="background:rgba(0,0,0,.4);padding:2px 6px;border-radius:3px">python app.py</code>`;
+    wrap.innerHTML = '';
+    wrap.appendChild(errDiv);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Analyze CSV';
+  }
+}
+
+// simulateCSVAnalysis intentionally removed — all results come from real backend
+
+function renderCSVResults(d){
+  // Warning banner if many columns are missing
+  const existingWarn = document.getElementById('csv-warning');
+  if (existingWarn) existingWarn.remove();
+  if (d.warning) {
+    const w = document.createElement('div');
+    w.id = 'csv-warning';
+    w.style.cssText = 'background:rgba(255,149,0,.12);border:1px solid rgba(255,149,0,.4);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:#ff9500;line-height:1.6';
+    const missingList = (d.missing_cols||[]).slice(0,8).join(', ');
+    w.innerHTML = `⚠️ ${d.warning}<br><span style="color:var(--muted);font-size:10px">Missing features: ${missingList}${d.missing_cols&&d.missing_cols.length>8?' …':''}</span>`;
+    document.getElementById('csv-results').prepend(w);
+  }
+
+  // Update side KPIs
+  document.getElementById('csv-total').textContent = fmt(d.total);
+  document.getElementById('csv-atk').textContent   = fmt(d.attacks);
+  document.getElementById('csv-norm').textContent  = fmt(d.normal);
+  document.getElementById('csv-rate').textContent  = d.attack_rate+'%';
+
+  document.getElementById('csv-placeholder').style.display = 'none';
+  document.getElementById('csv-content').style.display = '';
+
+  // Donut chart
+  drawDonut(d.category_dist);
+
+  // Result table
+  const tbody = document.getElementById('csv-tbody');
+  tbody.innerHTML = '';
+  (d.results||[]).forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    const badge = r.label===1
+      ? `<span class="badge badge-attack">ATTACK</span>`
+      : `<span class="badge badge-normal">NORMAL</span>`;
+    const col = ATTACK_COLORS[r.category]||'#6b7280';
+    tr.innerHTML = `
+      <td style="color:var(--muted)">${i+1}</td>
+      <td>${r.src_ip}</td><td>${r.dst_ip}</td>
+      <td style="color:#60a5fa">${r.proto}</td>
+      <td>${badge}</td>
+      <td><span style="color:${col}">${r.category}</span></td>
+      <td>${r.confidence}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function drawDonut(dist){
+  const canvas = document.getElementById('donut-canvas');
+  const ctx = canvas.getContext('2d');
+  const CX=80,CY=80,R=65,r=40;
+  ctx.clearRect(0,0,160,160);
+
+  const entries = Object.entries(dist).filter(([,v])=>v>0);
+  const total = entries.reduce((a,[,v])=>a+v,0)||1;
+  let start = -Math.PI/2;
+
+  const legend = document.getElementById('donut-legend');
+  legend.innerHTML = '';
+
+  entries.sort((a,b)=>b[1]-a[1]).forEach(([cat,cnt])=>{
+    const angle = (cnt/total)*Math.PI*2;
+    const col = ATTACK_COLORS[cat]||'#6b7280';
+
+    ctx.beginPath();
+    ctx.moveTo(CX,CY);
+    ctx.arc(CX,CY,R,start,start+angle);
+    ctx.closePath();
+    ctx.fillStyle = col+'cc';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(CX,CY,r,0,Math.PI*2);
+    ctx.fillStyle = '#050810';
+    ctx.fill();
+
+    start += angle;
+
+    const li = document.createElement('div');
+    li.className='leg-item';
+    li.innerHTML = `<div class="leg-dot" style="background:${col}"></div>
+      <div class="leg-lbl">${cat}</div>
+      <div class="leg-cnt">${cnt}</div>`;
+    legend.appendChild(li);
+  });
+
+  // Center label
+  ctx.fillStyle='#c8d8f0';
+  ctx.font='bold 14px "Share Tech Mono"';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(total, CX, CY-7);
+  ctx.fillStyle='#4a6080';
+  ctx.font='9px "Share Tech Mono"';
+  ctx.fillText('FLOWS', CX, CY+8);
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+// Pre-fill threshold display if fixed threshold is configured
+if (KITNET_FIXED_THRESHOLD !== null) {
+  const thrEl = document.getElementById('kitnet-threshold-val');
+  if (thrEl) { thrEl.textContent = KITNET_FIXED_THRESHOLD.toFixed(6); }
+  const wrapEl = document.getElementById('kitnet-warmup-wrap');
+  if (wrapEl) { wrapEl.style.display = 'none'; }
+}
+loadInterfaces();
+drawRadar();
+// Resize time chart
+function resizeChart(){
+  const c = document.getElementById('chart-container');
+  tcCanvas.width  = c.clientWidth - 32;
+  tcCanvas.height = 115;
+  drawTimeChart();
+}
+window.addEventListener('resize', resizeChart);
+resizeChart();
+</script>
+<!-- ── DEBUG PANEL (Ctrl+D to toggle) ──────────────────────────────────── -->
+<div id="debug-panel" style="position:fixed;bottom:0;left:0;right:0;height:280px;
+  background:rgba(5,8,16,.97);border-top:1px solid rgba(0,200,255,.4);
+  z-index:9998;display:none;flex-direction:column">
+  <div style="display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid rgba(0,200,255,.15)">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2px">🐛 DEBUG LOG</span>
+    <span style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-left:12px">Ctrl+D to hide</span>
+    <span id="dbg-sse-count" style="font-family:var(--mono);font-size:9px;color:var(--ok);margin-left:16px;padding:1px 6px;border:1px solid rgba(0,255,136,.2);border-radius:4px">SSE: 0 events</span>
+    <button onclick="document.getElementById('debug-panel').style.display='none'"
+      style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button>
+    <button onclick="_dbgLog.length=0;_renderDebugPanel()"
+      style="margin-left:8px;background:rgba(255,51,102,.15);border:1px solid rgba(255,51,102,.3);
+      color:var(--danger);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px">CLEAR</button>
+    <button onclick="checkBackend()"
+      style="margin-left:8px;background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.3);
+      color:var(--accent);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px">CHECK BACKEND</button>
+    <button onclick="checkCapture()"
+      style="margin-left:4px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);
+      color:var(--ok);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px">CHECK CAPTURE</button>
+  </div>
+  <div id="debug-log" style="flex:1;overflow-y:auto;padding:6px 10px;font-family:var(--mono);font-size:10px;line-height:1.6"></div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,40 @@
+# === Modèles IA (grands fichiers) ===
+models/
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+*.gguf
+*.h5
+*.pkl
+
+# === Environnement virtuel ===
+venv/
+env/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# === Variables d'environnement ===
+.env
+.env.local
+.env.*.local
+
+# === Python / Flask ===
+*.egg-info/
+dist/
+build/
+.eggs/
+instance/
+.webassets-cache
+
+# === IDE / OS ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
