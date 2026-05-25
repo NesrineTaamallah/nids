@@ -8,9 +8,7 @@
 ## 📸 Interface Overview
 
 
-![NetGuard Dashboard](images/Enregistrement 2026-05-25 195315.mp4)
-
----
+<video src="https://github.com/NesrineTaamallah/nids/issues/1#issue-4519066181" controls width="100%"></video>
 
 ## 🏗️ Architecture
 
@@ -90,7 +88,7 @@ Hierarchical approach outperforms direct multi-class classification by **+0.02 m
 
 > _Insert KitNET architecture diagram from report_
 
-![KitNET Architecture](images/kitnet_architecture.png)
+![KitNET Architecture](images/kitnet.png)
 
 ---
 
@@ -150,18 +148,14 @@ python app.py
 3. Flows appear in real-time — color-coded green (Normal), red (Attack), yellow (Zero-Day)
 4. KitNET warm-up bar shows calibration progress (500 packets) then switches to live RMSE scoring
 
-> _Insert screenshot of live capture mode with active flows_
 
-![Live Capture Mode](images/live_capture.png)
 
 ### CSV Import Mode
 1. Switch to **📂 CSV** tab
 2. Upload any UNSW-NB15-formatted CSV file
 3. Click **🔍 Analyze CSV** — results include label, category, confidence, and KitNET RMSE per row
 
-> _Insert screenshot of CSV analysis results with donut chart_
 
-![CSV Analysis Results](images/csv_analysis.png)
 
 ---
 
