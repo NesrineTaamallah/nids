@@ -5,12 +5,12 @@
 
 ---
 
-## 📸 Interface Overview
+##  Interface Overview
 
 
 <video src="https://github.com/NesrineTaamallah/nids/issues/1#issue-4519066181" controls width="100%"></video>
 
-## 🏗️ Architecture
+##  Architecture
 
 NetGuard uses a **sequential dual-pipeline** decision architecture:
 
@@ -19,9 +19,13 @@ NetGuard uses a **sequential dual-pipeline** decision architecture:
 
 ---
 
-## 📊 Key Results
+# ML Pipelines
 
-### Pipeline A — Supervised (UNSW-NB15 · 2,540,044 flows)
+
+
+## Pipeline A — Supervised (UNSW-NB15 · 2,540,044 flows)
+
+###  Key Results
 
 | Model | Task | F1 Score | AUC |
 |---|---|---|---|
@@ -29,32 +33,13 @@ NetGuard uses a **sequential dual-pipeline** decision architecture:
 | XGBoost | Multi-class (9 attack types) | — | — |
 | **Hierarchical Pipeline** | Binary + Multi-class | **Best macro F1** | — |
 
-Hierarchical approach outperforms direct multi-class classification by **+0.02 macro F1**, with the largest gains on rare classes (Analysis +0.06, Backdoor +0.06, Worms/Shellcode +0.07).
 
 
-![Confusion Matrix](images/confusion_matrix.png)
-
-> _Insert F1 comparison bar chart — direct vs hierarchical_
-
-![Hierarchical vs Direct F1](images/f1_comparison.png)
-
-### Pipeline B — Unsupervised / Zero-Day (Mirai · 764,137 packets)
-
-- Trained exclusively on **70,000 benign packets**; detects **694,000 Mirai attack packets** with no labeled examples
-- Detection threshold: `φ = exp(μ_ln + 3σ_ln)` — guarantees 99.7% normal traffic coverage (3σ rule)
-- Fixed pre-computed threshold: `φ = 0.046556`
-
-> _Insert KitNET RMSE distribution plot — normal vs anomaly_
-
-![KitNET RMSE Distribution](images/kitnet_rmse_distribution.png)
-
----
-
-## 🤖 Machine Learning Pipelines
-
-### Pipeline A — Supervised (UNSW-NB15)
+###  Pipeline
 
 **Features:** 70 engineered features from 49 raw UNSW-NB15 columns
+
+#### Preprocessing
 
 | Step | Strategy |
 |---|---|
@@ -65,16 +50,30 @@ Hierarchical approach outperforms direct multi-class classification by **+0.02 m
 | Normalization | `StandardScaler` (fit on train only) |
 | Class imbalance | `class_weight='balanced'` (RF), SMOTE for rare classes |
 
+#### Architecture
+
 **Stage 1 — Binary Filter:** Random Forest, 200 estimators, 5-fold stratified CV
+
 **Stage 2 — Multi-class:** XGBoost, 500 estimators, `lr=0.05`, `max_depth=6`, early stopping
 
-> _Insert feature importance chart here_
 
 ![Feature Importance](images/feature_importance.png)
 
-### Pipeline B — Unsupervised / KitNET (Kitsune/Mirai)
+---
 
-**AfterImage** extracts 115 temporal features per packet across 5 channels × 5 time windows (λ ∈ {5, 3, 1, 0.1, 0.01}):
+## Pipeline B — Unsupervised / Zero-Day (Mirai · 764,137 packets)
+
+###  Key Results
+
+- Trained exclusively on **70,000 benign packets**; detects **694,000 Mirai attack packets** with no labeled examples
+- Detection threshold: `φ = exp(μ_ln + 3σ_ln)` — guarantees **99.7% normal traffic coverage** (3σ rule)
+- Fixed pre-computed threshold: `φ = 0.046556`
+
+###  Pipeline
+
+#### AfterImage — Temporal Feature Extraction
+
+115 features per packet across **5 channels × 5 time windows** (λ ∈ {5, 3, 1, 0.1, 0.01}):
 
 | Channel | Captures |
 |---|---|
@@ -84,15 +83,14 @@ Hierarchical approach outperforms direct multi-class classification by **+0.02 m
 | IP↔Port | Service-specific traffic patterns |
 | Full socket | Complete TCP/UDP flow fingerprint |
 
-**KitNET** is an online ensemble of autoencoders — no memory storage, processes one packet at a time. Each subgroup of correlated features has a dedicated autoencoder; the final RMSE score feeds an output autoencoder.
+#### KitNET Architecture
 
-> _Insert KitNET architecture diagram from report_
+KitNET is an **online ensemble of autoencoders** — no memory storage, processes one packet at a time. Each subgroup of correlated features has a dedicated autoencoder; the final RMSE score feeds an output autoencoder.
+
 
 ![KitNET Architecture](images/kitnet.png)
 
----
-
-## 📦 Project Structure
+##  Project Structure
 
 ```
 netguard/
@@ -113,7 +111,7 @@ netguard/
 
 ---
 
-## ⚙️ Installation
+##  Installation
 
 **Prerequisites:** Python 3.8+, TShark/Wireshark (for live capture), Git
 
@@ -140,7 +138,7 @@ python app.py
 
 ---
 
-## 🚀 Usage
+##  Usage
 
 ### Live Capture Mode
 1. Select a network interface (or **Simulation Mode** for synthetic traffic)
@@ -159,25 +157,6 @@ python app.py
 
 ---
 
-## 🔌 API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Backend + model readiness check |
-| `GET` | `/api/interfaces` | Available network interfaces |
-| `POST` | `/api/capture/start` | Start capture `{"interface":"eth0"}` |
-| `POST` | `/api/capture/stop` | Stop capture |
-| `GET` | `/api/events` | **SSE stream** — live detections, stats, alerts |
-| `POST` | `/api/analyze/csv` | Upload and analyze a CSV file |
-| `GET` | `/api/alerts?limit=50` | Recent alert list |
-| `GET` | `/api/kitnet/status` | KitNET engine status + RMSE series |
-| `POST` | `/api/kitnet/reset` | Reset warm-up (recalibrate threshold) |
-| `GET` | `/api/debug/features` | Feature pipeline diagnostics |
-| `GET` | `/api/debug/capture` | Active flow state |
-
-SSE events: `detection` · `stats` · `ping` · `capture_stopped`
-
----
 
 ## 🎬 Demo Guide & Recommended Tools
 
@@ -210,15 +189,7 @@ Download a subset of UNSW-NB15 from [Kaggle](https://www.kaggle.com/datasets/mrw
 | UNSW-NB15 | 2,540,044 flows | Supervised training | UNSW Canberra |
 | Kitsune/Mirai | 764,137 packets | KitNET training | UCI ML Repo #516 |
 
-**UNSW-NB15 attack categories:** Generic · Exploits · Fuzzers · DoS · Reconnaissance · Analysis · Backdoor · Shellcode · Worms
 
-> _Insert class distribution bar chart from EDA_
-
-![Class Distribution](images/class_distribution.png)
-
-> _Insert correlation heatmap from EDA_
-
-![Feature Correlation Heatmap](images/correlation_heatmap.png)
 
 ---
 
