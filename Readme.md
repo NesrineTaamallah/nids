@@ -57,7 +57,7 @@ NetGuard uses a **sequential dual-pipeline** decision architecture:
 **Stage 2 — Multi-class:** XGBoost, 500 estimators, `lr=0.05`, `max_depth=6`, early stopping
 
 
-![Feature Importance](images/feature_importance.png)
+![Feature Importance](images/supervised.png)
 
 ---
 
@@ -117,7 +117,7 @@ netguard/
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/<your-org>/netguard.git && cd netguard
+git clone https://github.com/NesrineTaamallah/nids && cd nids
 
 # 2. Install Python dependencies
 pip install -r requirements.txt
@@ -125,7 +125,12 @@ pip install -r requirements.txt
 # 3. Clone KitNET library (must be placed next to app.py)
 git clone https://github.com/ymirsky/KitNET-py.git
 
-# 4. Place trained model .pkl files + metadata.json inside models/
+# 4. Train the models and save them to models/
+#    Run both notebooks in order:
+#      - notebooks/pipeline_a.ipynb  →  trains RF (binary) + XGBoost (multi-class), saves .pkl + metadata.json
+#      - notebooks/pipeline_b.ipynb  →  trains KitNET on benign traffic, saves model artifacts
+jupyter nbconvert --to notebook --execute notebooks/pipeline_a.ipynb
+jupyter nbconvert --to notebook --execute notebooks/pipeline_b.ipynb
 
 # 5. Start the backend
 python app.py
@@ -158,7 +163,7 @@ python app.py
 ---
 
 
-## 🎬 Demo Guide & Recommended Tools
+##  Demo Guide & Recommended Tools
 
 ### Option 1 — Simulation Mode (no setup needed)
 Select **Simulation Mode** in the interface dropdown. The backend generates synthetic flows across 10 realistic scenarios (HTTP, DNS, SSH, DoS, Reconnaissance, Backdoor…) — no TShark or network permissions required. Best for demos on any laptop.
@@ -182,7 +187,7 @@ Download a subset of UNSW-NB15 from [Kaggle](https://www.kaggle.com/datasets/mrw
 
 ---
 
-## 🧪 Dataset Summary
+##  Dataset Summary
 
 | Dataset | Flows/Packets | Use | Source |
 |---|---|---|---|
@@ -193,7 +198,7 @@ Download a subset of UNSW-NB15 from [Kaggle](https://www.kaggle.com/datasets/mrw
 
 ---
 
-## 📚 References
+##  References
 
 1. Moustafa & Slay — *UNSW-NB15*, MilCIS 2015
 2. Mirsky et al. — *Kitsune: Ensemble of Autoencoders for NIDS*, NDSS 2018
@@ -204,5 +209,5 @@ Download a subset of UNSW-NB15 from [Kaggle](https://www.kaggle.com/datasets/mrw
 ---
 
 <div align="center">
-<b>NetGuard</b> · Real-Time IoT Malware Detection · EPT 2024–2025
+<b>NetGuard</b> · Real-Time IoT Malware Detection · EPT 2025–2026
 </div>
