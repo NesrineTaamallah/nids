@@ -8,8 +8,7 @@
 ## 📸 Interface Overview
 
 
-<video src="images/Enregistrement 2026-05-25 195315.mp4" controls width="100%"></video>
----
+<video src="https://github.com/NesrineTaamallah/nids/issues/1#issue-4519066181" controls width="100%"></video>---
 
 ## 🏗️ Architecture
 
