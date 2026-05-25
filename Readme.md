@@ -8,8 +8,7 @@
 ## 📸 Interface Overview
 
 
-![NetGuard Dashboard](images/Enregistrement 2026-05-25 195315.mp4)
-
+<video src="images/Enregistrement 2026-05-25 195315.mp4" controls width="100%"></video>
 ---
 
 ## 🏗️ Architecture
